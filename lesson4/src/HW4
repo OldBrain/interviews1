@@ -1,0 +1,85 @@
+CREATE TABLE films (
+    id       INTEGER       PRIMARY KEY AUTOINCREMENT,
+    title    VARCHAR (256) NOT NULL,
+    duration TEXT          NOT NULL
+);
+
+
+CREATE TABLE session (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    begin_time TEXT    NOT NULL,
+    film_id    INTEGER
+);
+
+CREATE TABLE tickets (
+    id         INTEGER         PRIMARY KEY AUTOINCREMENT,
+    price      DECIMAL (10, 2) NOT NULL
+                               DEFAULT (0),
+    session_id INTEGER         NOT NULL
+);
+
+CREATE VIEW films_ticket_count AS
+    SELECT session.film_id AS film_id,
+           COUNT(tickets.id) AS tickets_count
+      FROM session
+           JOIN
+           tickets ON session.id = tickets.session_id
+     GROUP BY session.id;
+
+with Q as(
+SELECT
+           schedule.title,
+           COUNT(*) AS sold_ticked,
+           (SELECT AVG(SESSION.film_id) FROM SESSION JOIN films ON films.id = session.film_id ORDER BY session.film_id) AS average_number_per_session,
+           SUM(tickets.price) AS total_price
+
+FROM schedule
+           JOIN
+           tickets ON tickets
+           .session_id = schedule.session_id
+     GROUP BY schedule.title
+     ORDER BY total_price  DESC)
+     SELECT * FROM Q
+     UNION ALL
+     SELECT 'ИТОГ',SUM(sold_ticked),'-/-',SUM(total_price) FROM Q
+
+     CREATE VIEW financy_analysis_session AS
+     WITH Q AS (
+             SELECT schedule.session_id,
+                    schedule.title,
+                    schedule.[begin],
+                    schedule.[end],
+                    SUM(tickets.price) AS total_price,
+                    COUNT(tickets.price) AS sold_ticked
+               FROM schedule
+                    LEFT JOIN
+                    tickets ON tickets.session_id = schedule.session_id
+              GROUP BY schedule.session_id
+         )
+         SELECT *
+           FROM Q
+         UNION ALL
+         SELECT 'ИТОГ',
+                'ВСЕХ ФИЛЬМОВ:',
+                '',
+                '',
+                SUM(total_price),
+                SUM(sold_ticked)
+           FROM Q;
+
+CREATE VIEW group_session_analises AS
+    SELECT financy_analysis_session.[begin] AS time_begin,
+           financy_analysis_session.[begin] BETWEEN '09:00' AND '15:01'-- SUM(financy_analysis_session.sold_ticked),
+      /* SUM(financy_analysis_session.total_price) */FROM financy_analysis_session/* group by (time_begin between '09:00' AND '15:01') OR (time_begin between '15:02' AND '24:01'); */;
+
+
+CREATE VIEW schedule AS
+    SELECT session.film_id,
+           session.id AS session_id,
+           films.title AS title,
+           time(session.begin_time) AS [begin],
+           time(films.duration, +session.begin_time) AS [end]
+      FROM session
+           INNER JOIN
+           films ON session.film_id = films.id
+     ORDER BY [begin];
